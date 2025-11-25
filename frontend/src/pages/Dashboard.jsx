@@ -56,6 +56,18 @@ const Dashboard = () => {
   const totalInventory = inventory.length;
   const totalWarehouses = warehouses.length;
   const totalValue = inventory.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  
+  // Calculate total storage capacity and usage
+  const totalCapacity = warehouses.reduce((sum, w) => sum + w.capacity, 0);
+  const totalUsed = warehouses.reduce((sum, w) => sum + (w.storageInfo?.used || 0), 0);
+  const totalRemaining = totalCapacity - totalUsed;
+  const overallUsagePercentage = totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0;
+
+  const getStorageColor = (percentage) => {
+    if (percentage >= 90) return { bg: "bg-red-500", text: "text-red-600", light: "bg-red-50" };
+    if (percentage >= 70) return { bg: "bg-yellow-500", text: "text-yellow-600", light: "bg-yellow-50" };
+    return { bg: "bg-green-500", text: "text-green-600", light: "bg-green-50" };
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 p-6">
@@ -69,7 +81,7 @@ const Dashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
             <div className="flex items-center justify-between">
               <div>
@@ -105,6 +117,19 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm font-medium">Storage Available</p>
+                <p className="text-3xl font-bold text-gray-800 mt-2">{totalRemaining}</p>
+                <p className="text-xs text-gray-500 mt-1">{overallUsagePercentage}% used</p>
+              </div>
+              <div className="bg-orange-100 p-4 rounded-full">
+                <span className="text-3xl">📊</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Warehouses */}
@@ -125,11 +150,19 @@ const Dashboard = () => {
             warehouses.map((warehouse) => {
               const warehouseInventory = getInventoryForWarehouse(warehouse._id);
               const warehouseValue = warehouseInventory.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+              const storageInfo = warehouse.storageInfo || {
+                used: 0,
+                remaining: warehouse.capacity,
+                total: warehouse.capacity,
+                usagePercentage: 0,
+                itemCount: 0
+              };
+              const colors = getStorageColor(storageInfo.usagePercentage);
               
               return (
                 <div key={warehouse._id} className="bg-white rounded-xl shadow-lg overflow-hidden">
                   <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-4">
                       <div>
                         <h2 className="text-2xl font-bold mb-1">{warehouse.name}</h2>
                         <p className="text-blue-100 flex items-center gap-2">
@@ -139,6 +172,26 @@ const Dashboard = () => {
                       <div className="text-right">
                         <p className="text-sm text-blue-100">Capacity</p>
                         <p className="text-2xl font-bold">{warehouse.capacity} units</p>
+                      </div>
+                    </div>
+                    
+                    {/* Storage Progress Bar */}
+                    <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Storage Usage</span>
+                        <span className="text-sm font-semibold">
+                          {storageInfo.usagePercentage}% used
+                        </span>
+                      </div>
+                      <div className="w-full bg-white/30 rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className={`h-full bg-white transition-all duration-500 rounded-full`}
+                          style={{ width: `${Math.min(storageInfo.usagePercentage, 100)}%` }}
+                        ></div>
+                      </div>
+                      <div className="flex items-center justify-between mt-2 text-xs">
+                        <span>{storageInfo.used} used</span>
+                        <span>{storageInfo.remaining} remaining</span>
                       </div>
                     </div>
                   </div>

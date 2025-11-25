@@ -11,10 +11,21 @@ const Register = () => {
     password: "",
     phone: "",
     address: "",
+    securityQuestion: "",
+    securityAnswer: "",
   });
   const navigate = useNavigate();
 
-  // Redirect if already logged in
+  const securityQuestions = [
+    "What was the name of your first pet?",
+    "In which city were you born?",
+    "What is your mother's maiden name?",
+    "What was the name of your first school?",
+    "What is your favorite book?",
+    "What was your childhood nickname?"
+  ];
+
+  // Don't let logged-in users access this page
   useEffect(() => {
     if (!loading && shop) {
       navigate("/");
@@ -35,7 +46,7 @@ const Register = () => {
     }
   };
 
-  // Show loading while checking auth state
+  // Wait for auth check before showing the form
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -116,6 +127,48 @@ const Register = () => {
                 value={formData.address}
                 required
               />
+            </div>
+            
+            {/* Security question for password recovery */}
+            <div className="border-t-2 border-gray-200 pt-4 mt-2">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Security Question (for password recovery)
+              </h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select a Security Question</label>
+                  <select
+                    name="securityQuestion"
+                    className="w-full p-4 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                    onChange={handleChange}
+                    value={formData.securityQuestion}
+                    required
+                  >
+                    <option value="">-- Choose a question --</option>
+                    {securityQuestions.map((question, index) => (
+                      <option key={index} value={question}>{question}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Your Answer</label>
+                  <input
+                    name="securityAnswer"
+                    type="text"
+                    placeholder="Enter your answer"
+                    className="w-full p-4 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                    onChange={handleChange}
+                    value={formData.securityAnswer}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Remember this answer - you'll need it to reset your password</p>
+                </div>
+              </div>
             </div>
             <button
               type="submit"

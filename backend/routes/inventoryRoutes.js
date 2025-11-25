@@ -5,15 +5,13 @@ import protect from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-/**
- * ✅ Add a Product to Inventory (Protected)
- */
+// Add a new product to inventory
 router.post("/", protect, async (req, res) => {
   try {
     const { warehouseId, productName, sku, quantity, price, category } =
       req.body;
 
-    // Check if the warehouse belongs to the shop
+    // Make sure the warehouse belongs to this shop
     const warehouse = await Warehouse.findOne({
       _id: warehouseId,
       shopId: req.shop._id,
@@ -39,9 +37,7 @@ router.post("/", protect, async (req, res) => {
   }
 });
 
-/**
- * ✅ Delete a Product from Inventory (Protected)
- */
+// Delete a product from inventory
 router.delete("/:id", protect, async (req, res) => {
   try {
     const inventoryItem = await Inventory.findOne({
@@ -61,9 +57,7 @@ router.delete("/:id", protect, async (req, res) => {
   }
 });
 
-/**
- * ✅ Update Inventory Item (Protected) - Can update quantity, price, and other fields
- */
+// Update inventory item - can change quantity, price, etc.
 router.put("/:id", protect, async (req, res) => {
   try {
     const { quantity, price, productName, category } = req.body;
@@ -77,7 +71,7 @@ router.put("/:id", protect, async (req, res) => {
         .status(404)
         .json({ message: "Product not found or unauthorized" });
 
-    // Update only provided fields
+    // Only update the fields they actually sent
     if (quantity !== undefined) inventoryItem.quantity = quantity;
     if (price !== undefined) inventoryItem.price = price;
     if (productName !== undefined) inventoryItem.productName = productName;
@@ -91,24 +85,56 @@ router.put("/:id", protect, async (req, res) => {
   }
 });
 
-/**
- * ✅ Get All Inventory for a Shop (Protected)
- */
+// Get inventory organized by warehouse - this route needs to be before the general GET route
+router.get("/by-warehouse", protect, async (req, res) => {
+  try {
+    const warehouses = await Warehouse.find({ shopId: req.shop._id });
+    const inventory = await Inventory.find({ shopId: req.shop._id });
+
+    const warehouseGroups = warehouses.map(warehouse => {
+      const products = inventory.filter(
+        item => item.warehouseId.toString() === warehouse._id.toString()
+      );
+
+      const totalItems = products.reduce((sum, item) => sum + item.quantity, 0);
+      const totalValue = products.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+
+      return {
+        warehouse: {
+          _id: warehouse._id,
+          name: warehouse.name,
+          location: warehouse.location,
+          capacity: warehouse.capacity
+        },
+        products,
+        stats: {
+          productCount: products.length,
+          totalItems,
+          totalValue: totalValue.toFixed(2)
+        }
+      };
+    });
+
+    res.json(warehouseGroups);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
+});
+
+// Get all inventory items for this shop
 router.get("/", protect, async (req, res) => {
   try {
-    const inventory = await Inventory.find({ shopId: req.shop._id });
+    const inventory = await Inventory.find({ shopId: req.shop._id }).populate('warehouseId');
     res.json(inventory);
   } catch (error) {
     res.status(500).json({ message: "Server Error", error });
   }
 });
 
-/**
- * ✅ Bulk Update Inventory Quantities (Protected)
- */
+// Update multiple inventory quantities at once
 router.patch("/update-quantities", protect, async (req, res) => {
   try {
-    const updates = req.body.updates; // Array of { id, quantity }
+    const updates = req.body.updates; // Expecting an array like [{ id, quantity }]
 
     if (!Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({ message: "Invalid input format" });

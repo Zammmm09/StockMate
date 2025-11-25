@@ -69,9 +69,15 @@ const Navbar = () => {
           <div>
             {shop ? (
               <div className="flex items-center space-x-4">
-                <div className="bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm">
-                  <span className="font-medium">👋 {shop.name}</span>
-                </div>
+                <NavLink
+                  to="/profile"
+                  className="group flex items-center space-x-3 bg-white/10 px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/20 hover:bg-white/20 hover:border-white/30 transition-all duration-200"
+                >
+                  <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center text-lg group-hover:bg-white/40 transition-all">
+                    👤
+                  </div>
+                  <span className="font-medium">{shop.name}</span>
+                </NavLink>
                 <button
                   onClick={handleLogout}
                   className="bg-red-500 px-5 py-2 rounded-lg hover:bg-red-600 font-medium transition-colors shadow-md hover:shadow-lg"

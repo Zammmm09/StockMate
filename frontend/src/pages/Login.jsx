@@ -10,7 +10,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  // Redirect if already logged in
+  // Already logged in? Send them to dashboard
   useEffect(() => {
     if (!loading && shop) {
       navigate("/");
@@ -29,7 +29,7 @@ const Login = () => {
     }
   };
 
-  // Show loading while checking auth state
+  // Wait for auth check before rendering
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -92,6 +92,12 @@ const Login = () => {
               Sign In
             </button>
           </form>
+
+          <div className="mt-4 text-center">
+            <a href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              Forgot your password?
+            </a>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-gray-600">

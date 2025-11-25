@@ -39,7 +39,7 @@ const Footer = () => {
           <div>
             <h3 className="text-xl font-bold mb-4">About</h3>
             <p className="text-blue-100 mb-2">
-              Created with ❤️ by
+              Created & Developed by
             </p>
             <p className="text-white font-semibold text-lg">
               Zaeem
