@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import axios from "axios";
+import ShopContext from "../context/ShopContext";
 
 const Warehouse = () => {
+  const { shop } = useContext(ShopContext);
   const [warehouses, setWarehouses] = useState([]);
   const [formData, setFormData] = useState({ name: "", location: "", capacity: "" });
   const [editingWarehouse, setEditingWarehouse] = useState(null);
   const [editFormData, setEditFormData] = useState({ name: "", location: "", capacity: "" });
+  const [searchQuery, setSearchQuery] = useState("");
+  const role = shop?.role || "owner";
+  const canManageWarehouses = role === "owner" || role === "manager";
+  const canDeleteWarehouses = role === "owner";
 
   useEffect(() => {
     fetchWarehouses();
@@ -113,6 +119,12 @@ const Warehouse = () => {
     setEditFormData({ name: "", location: "", capacity: "" });
   };
 
+  // Filter warehouses based on search query
+  const filteredWarehouses = warehouses.filter(warehouse =>
+    warehouse.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    warehouse.location.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const handleUpdateWarehouse = async (e, warehouseId) => {
     e.preventDefault();
     try {
@@ -142,57 +154,90 @@ const Warehouse = () => {
         </div>
 
         {/* Form to add a new warehouse */}
+        {canManageWarehouses ? (
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <span>➕</span> Add New Warehouse
+            </h3>
+            <form onSubmit={handleAddWarehouse} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Warehouse Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Enter warehouse name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                <input
+                  type="text"
+                  name="location"
+                  placeholder="Enter location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Capacity (units)</label>
+                <input
+                  type="number"
+                  name="capacity"
+                  placeholder="Enter capacity"
+                  value={formData.capacity}
+                  onChange={handleChange}
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  min="1"
+                  required
+                />
+              </div>
+              <div className="md:col-span-3">
+                <button 
+                  type="submit" 
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl"
+                >
+                  ➕ Add Warehouse
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-blue-100">
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">Warehouse Access</h3>
+            <p className="text-gray-600">Employees can view warehouse information, but only owners and managers can create or edit warehouses.</p>
+          </div>
+        )}
+
+        {/* Search Bar */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <span>➕</span> Add New Warehouse
-          </h3>
-          <form onSubmit={handleAddWarehouse} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Warehouse Name</label>
-              <input
-                type="text"
-                name="name"
-                placeholder="Enter warehouse name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-              <input
-                type="text"
-                name="location"
-                placeholder="Enter location"
-                value={formData.location}
-                onChange={handleChange}
-                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Capacity (units)</label>
-              <input
-                type="number"
-                name="capacity"
-                placeholder="Enter capacity"
-                value={formData.capacity}
-                onChange={handleChange}
-                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                min="1"
-                required
-              />
-            </div>
-            <div className="md:col-span-3">
-              <button 
-                type="submit" 
-                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl"
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="🔍 Search warehouses by name or location..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full p-4 pr-12 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-lg"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                ➕ Add Warehouse
+                ✕
               </button>
-            </div>
-          </form>
+            )}
+          </div>
+          {searchQuery && (
+            <p className="mt-2 text-sm text-gray-600">
+              Found {filteredWarehouses.length} warehouses
+            </p>
+          )}
         </div>
 
         {/* List of all warehouses */}
@@ -202,19 +247,19 @@ const Warehouse = () => {
               <span>🏭</span> Your Warehouses
             </h3>
             <span className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-semibold">
-              {warehouses.length} {warehouses.length === 1 ? 'warehouse' : 'warehouses'}
+              {filteredWarehouses.length} {filteredWarehouses.length === 1 ? 'warehouse' : 'warehouses'}
             </span>
           </div>
           
-          {warehouses.length === 0 ? (
+          {filteredWarehouses.length === 0 ? (
             <div className="text-center py-16">
               <span className="text-6xl mb-4 block">🏭</span>
-              <h4 className="text-xl font-semibold text-gray-800 mb-2">No Warehouses Yet</h4>
-              <p className="text-gray-600">Create your first warehouse to get started</p>
+              <h4 className="text-xl font-semibold text-gray-800 mb-2">{searchQuery ? 'No Warehouses Found' : 'No Warehouses Yet'}</h4>
+              <p className="text-gray-600">{searchQuery ? 'Try adjusting your search query' : 'Create your first warehouse to get started'}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {warehouses.map((warehouse) => {
+              {filteredWarehouses.map((warehouse) => {
                 const storageInfo = warehouse.storageInfo || {
                   used: 0,
                   remaining: warehouse.capacity,
@@ -320,26 +365,30 @@ const Warehouse = () => {
                               <span>📍</span> {warehouse.location}
                             </p>
                           </div>
-                          <div className="flex gap-2">
-                            <div className="bg-blue-100 p-2 rounded-lg">
-                              <button
-                                onClick={() => handleEditClick(warehouse)}
-                                className="text-blue-600 hover:text-blue-700 text-xl transition-colors"
-                                title="Edit warehouse"
-                              >
-                                ✏️
-                              </button>
+                          {canManageWarehouses && (
+                            <div className="flex gap-2">
+                              <div className="bg-blue-100 p-2 rounded-lg">
+                                <button
+                                  onClick={() => handleEditClick(warehouse)}
+                                  className="text-blue-600 hover:text-blue-700 text-xl transition-colors"
+                                  title="Edit warehouse"
+                                >
+                                  ✏️
+                                </button>
+                              </div>
+                              {canDeleteWarehouses && (
+                                <div className="bg-red-100 p-2 rounded-lg">
+                                  <button
+                                    onClick={() => handleDeleteWarehouse(warehouse._id, warehouse.name)}
+                                    className="text-red-600 hover:text-red-700 text-xl transition-colors"
+                                    title="Delete warehouse"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                            <div className="bg-red-100 p-2 rounded-lg">
-                              <button
-                                onClick={() => handleDeleteWarehouse(warehouse._id, warehouse.name)}
-                                className="text-red-600 hover:text-red-700 text-xl transition-colors"
-                                title="Delete warehouse"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </div>
+                          )}
                         </div>
 
                         {/* Storage usage bar */}
@@ -389,7 +438,7 @@ const Warehouse = () => {
                             </span>
                           </div>
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 );

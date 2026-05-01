@@ -28,7 +28,7 @@ const Register = () => {
   // Don't let logged-in users access this page
   useEffect(() => {
     if (!loading && shop) {
-      navigate("/");
+      navigate("/dashboard");
     }
   }, [shop, loading, navigate]);
 

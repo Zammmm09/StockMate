@@ -13,7 +13,7 @@ const Login = () => {
   // Already logged in? Send them to dashboard
   useEffect(() => {
     if (!loading && shop) {
-      navigate("/");
+      navigate("/dashboard");
     }
   }, [shop, loading, navigate]);
 
@@ -23,7 +23,7 @@ const Login = () => {
     try {
       const response = await axios.post("http://localhost:5000/api/shop/login", { email, password });
       loginShop(response.data.shop, response.data.token);
-      navigate("/");
+      navigate("/dashboard");
     } catch (error) {
       setError(error.response?.data?.message || "Login failed. Please check your credentials.");
     }

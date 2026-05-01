@@ -3,6 +3,8 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Shop from "../models/shopModel.js";
 import protect from "../middleware/authMiddleware.js";
+import requireRoles from "../middleware/roleMiddleware.js";
+import logActivity from "../utils/activityLogger.js";
 
 const router = express.Router();
 
@@ -10,8 +12,9 @@ const router = express.Router();
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password, phone, address, securityQuestion, securityAnswer } = req.body;
+    const normalizedEmail = email?.toLowerCase();
 
-    if (await Shop.findOne({ email })) {
+    if (await Shop.findOne({ email: normalizedEmail })) {
       return res.status(400).json({ message: "Email already exists" });
     }
 
@@ -20,8 +23,10 @@ router.post("/register", async (req, res) => {
     
     const shop = await Shop.create({ 
       name, 
-      email, 
+      email: normalizedEmail, 
       password: hashedPassword, 
+      role: "owner",
+      parentShopId: null,
       phone, 
       address,
       securityQuestion,
@@ -38,7 +43,7 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const shop = await Shop.findOne({ email });
+    const shop = await Shop.findOne({ email: email.toLowerCase() });
 
     if (!shop || !(await bcrypt.compare(password, shop.password))) {
       return res.status(401).json({ message: "Invalid credentials" });
@@ -46,7 +51,17 @@ router.post("/login", async (req, res) => {
 
     const token = jwt.sign({ id: shop._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-    res.json({ token, shop: { id: shop._id, name: shop.name, email: shop.email } });
+    res.json({
+      token,
+      shop: {
+        _id: shop._id,
+        id: shop._id,
+        name: shop.name,
+        email: shop.email,
+        role: shop.role || "owner",
+        parentShopId: shop.parentShopId || null,
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error });
   }
@@ -117,6 +132,7 @@ router.put("/:id", protect, async (req, res) => {
         _id: updatedShop._id,
         name: updatedShop.name,
         email: updatedShop.email,
+        role: updatedShop.role,
         phone: updatedShop.phone,
         address: updatedShop.address,
         securityQuestion: updatedShop.securityQuestion
@@ -276,6 +292,16 @@ router.delete("/:id", protect, async (req, res) => {
       });
     }
 
+    if ((req.shop.role || "owner") === "owner") {
+      const childStaffCount = await Shop.countDocuments({ parentShopId: shopId });
+      if (childStaffCount > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Remove team members before deleting the owner account",
+        });
+      }
+    }
+
     // Check if password is correct
     const isPasswordCorrect = await bcrypt.compare(password, shop.password);
     if (!isPasswordCorrect) {
@@ -298,6 +324,147 @@ router.delete("/:id", protect, async (req, res) => {
       success: false, 
       message: "Server error while deleting shop" 
     });
+  }
+});
+
+// Owner creates manager/employee accounts under the same shop
+router.post("/staff", protect, requireRoles("owner", "manager"), async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      password,
+      role,
+      phone,
+      address,
+      securityQuestion,
+      securityAnswer,
+    } = req.body;
+
+    const normalizedEmail = email?.toLowerCase();
+
+    if (!["manager", "employee"].includes(role)) {
+      return res.status(400).json({ message: "Invalid staff role" });
+    }
+
+    // Managers can only create employees, not managers
+    const requesterRole = req.shopRole;
+    if (requesterRole === "manager" && role === "manager") {
+      return res.status(403).json({ message: "Managers can only create employee accounts" });
+    }
+
+    console.log("POST /staff - Creating staff with role:", role, "requesterRole:", requesterRole);
+
+
+    if (await Shop.findOne({ email: normalizedEmail })) {
+      return res.status(400).json({ message: "Email already exists" });
+    }
+
+    if (!securityQuestion || !securityAnswer) {
+      return res.status(400).json({ message: "Security question and answer are required" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedAnswer = await bcrypt.hash(securityAnswer.toLowerCase().trim(), 10);
+
+    // For manager: use their parentShopId (owner's ID); for owner: use their own ID
+    const parentId = req.shop.parentShopId || req.shop._id;
+
+    const staff = await Shop.create({
+      name,
+      email: normalizedEmail,
+      password: hashedPassword,
+      role,
+      parentShopId: parentId,
+      phone,
+      address,
+      securityQuestion,
+      securityAnswer: hashedAnswer,
+    });
+
+    await logActivity({
+      req,
+      action: "create",
+      entityType: "staff",
+      entityId: staff._id,
+      summary: `Created ${role} account for ${name}`,
+      metadata: { name, email: normalizedEmail, role, phone, address },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Staff account created successfully",
+      staff: {
+        _id: staff._id,
+        name: staff.name,
+        email: staff.email,
+        role: staff.role,
+        parentShopId: staff.parentShopId,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
+});
+
+// Owner or manager can list team members
+router.get("/staff", protect, requireRoles("owner", "manager"), async (req, res) => {
+  try {
+    // For manager: use their parentShopId (owner's ID); for owner: use their own ID
+    const shopId = req.shop.parentShopId || req.shop._id;
+    const requesterRole = req.shopRole;
+    
+    let query = { parentShopId: shopId };
+    // Managers can only see employees, not other managers
+    if (requesterRole === "manager") {
+      query.role = "employee";
+    }
+    
+    console.log("GET /staff - shopId:", shopId, "requesterRole:", requesterRole, "query:", query);
+    const staff = await Shop.find(query).select("-password");
+    console.log("Found staff:", staff.length, "items");
+    res.json(staff);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
+});
+
+// Owner or manager can delete staff
+router.delete("/staff/:id", protect, requireRoles("owner", "manager"), async (req, res) => {
+  try {
+    const shopId = req.shop.parentShopId || req.shop._id;
+    const requesterRole = req.shopRole || req.shop?.role || "owner";
+    
+    let query = {
+      _id: req.params.id,
+      parentShopId: shopId,
+    };
+    
+    // Managers can only delete employees
+    if (requesterRole === "manager") {
+      query.role = "employee";
+    }
+    
+    const staff = await Shop.findOne(query);
+
+    if (!staff) {
+      return res.status(404).json({ message: "Staff account not found" });
+    }
+
+    await staff.deleteOne();
+
+    await logActivity({
+      req,
+      action: "delete",
+      entityType: "staff",
+      entityId: staff._id,
+      summary: `Removed staff account ${staff.name}`,
+      metadata: { name: staff.name, email: staff.email, role: staff.role },
+    });
+
+    res.json({ success: true, message: "Staff account deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
   }
 });
 

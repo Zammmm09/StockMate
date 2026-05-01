@@ -3,7 +3,7 @@ import { useContext } from "react";
 import ShopContext from "./context/ShopContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import AIChatbox from "./components/AIChatbox";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -11,6 +11,9 @@ import Dashboard from "./pages/Dashboard";
 import Warehouses from "./pages/Warehouse";
 import Inventory from "./pages/Inventory";
 import Profile from "./pages/Profile";
+import Team from "./pages/Team";
+import ActivityLog from "./pages/ActivityLog";
+import Chat from "./pages/Chat";
 
 function App() {
   const { shop, loading } = useContext(ShopContext);
@@ -32,17 +35,20 @@ function App() {
       <Navbar />
       <div className="flex-1 container mx-auto p-4">
         <Routes>
-          <Route path="/" element={shop ? <Dashboard /> : <Navigate to="/login" />} />
+          <Route path="/" element={<ProtectedRoute><Navigate to="/dashboard" replace /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/warehouses" element={shop ? <Warehouses /> : <Navigate to="/login" />} />
-          <Route path="/inventory" element={shop ? <Inventory /> : <Navigate to="/login" />} />
-          <Route path="/profile" element={shop ? <Profile /> : <Navigate to="/login" />} />
+          <Route path="/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
+          <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+          <Route path="/team" element={<ProtectedRoute roles={["owner", "manager"]}><Team /></ProtectedRoute>} />
+          <Route path="/activity" element={<ProtectedRoute roles={["owner"]}><ActivityLog /></ProtectedRoute>} />
         </Routes>
       </div>
       <Footer />
-      {shop && <AIChatbox />}
     </div>
   );
 }

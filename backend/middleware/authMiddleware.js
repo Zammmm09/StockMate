@@ -10,6 +10,9 @@ const protect = async (req, res, next) => {
     req.shop = await Shop.findById(decoded.id).select("-password");
     if (!req.shop) return res.status(401).json({ message: "Shop not found" });
 
+    req.shopRole = req.shop.role || "owner";
+    req.accessShopId = req.shop.parentShopId || req.shop._id;
+
     next();
   } catch (error) {
     res.status(401).json({ message: "Invalid Token" });

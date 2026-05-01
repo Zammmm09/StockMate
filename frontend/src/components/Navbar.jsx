@@ -5,6 +5,28 @@ import ShopContext from "../context/ShopContext";
 const Navbar = () => {
   const { shop, logoutShop } = useContext(ShopContext);
   const navigate = useNavigate();
+  const role = shop?.role || "owner";
+
+  const roleLabel = {
+    owner: "Owner",
+    manager: "Manager",
+    employee: "Employee",
+  }[role];
+
+  const menuItems = [
+    { to: "/dashboard", label: "📊 Dashboard" },
+    { to: "/inventory", label: "📦 Inventory" },
+    { to: "/warehouses", label: "🏭 Warehouses" },
+    { to: "/chat", label: "💬 Chat" },
+  ];
+
+  if (role === "owner" || role === "manager") {
+    menuItems.push({ to: "/team", label: "👥 Team" });
+  }
+
+  if (role === "owner") {
+    menuItems.push({ to: "/activity", label: "📝 Activity" });
+  }
 
   const handleLogout = () => {
     logoutShop();
@@ -26,42 +48,21 @@ const Navbar = () => {
           {/* Navigation Links (Only for logged-in shops) */}
           {shop && (
             <div className="flex space-x-2">
-              <NavLink
-                to="/"
-                className={({ isActive }) =>
-                  `px-4 py-2 rounded-lg font-medium transition-all ${
-                    isActive 
-                      ? "bg-white text-blue-600 shadow-md" 
-                      : "hover:bg-blue-700 hover:shadow-sm"
-                  }`
-                }
-              >
-                📊 Dashboard
-              </NavLink>
-              <NavLink
-                to="/inventory"
-                className={({ isActive }) =>
-                  `px-4 py-2 rounded-lg font-medium transition-all ${
-                    isActive 
-                      ? "bg-white text-blue-600 shadow-md" 
-                      : "hover:bg-blue-700 hover:shadow-sm"
-                  }`
-                }
-              >
-                📦 Inventory
-              </NavLink>
-              <NavLink
-                to="/warehouses"
-                className={({ isActive }) =>
-                  `px-4 py-2 rounded-lg font-medium transition-all ${
-                    isActive 
-                      ? "bg-white text-blue-600 shadow-md" 
-                      : "hover:bg-blue-700 hover:shadow-sm"
-                  }`
-                }
-              >
-                🏭 Warehouses
-              </NavLink>
+              {menuItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `px-4 py-2 rounded-lg font-medium transition-all ${
+                      isActive
+                        ? "bg-white text-blue-600 shadow-md"
+                        : "hover:bg-blue-700 hover:shadow-sm"
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
             </div>
           )}
 
@@ -76,7 +77,10 @@ const Navbar = () => {
                   <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center text-lg group-hover:bg-white/40 transition-all">
                     👤
                   </div>
-                  <span className="font-medium">{shop.name}</span>
+                  <div className="text-left">
+                    <span className="font-medium block">{shop.name}</span>
+                    <span className="text-xs uppercase tracking-wide text-blue-100">{roleLabel}</span>
+                  </div>
                 </NavLink>
                 <button
                   onClick={handleLogout}

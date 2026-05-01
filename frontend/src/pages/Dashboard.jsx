@@ -9,6 +9,8 @@ const Dashboard = () => {
   const [warehouses, setWarehouses] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const role = shop?.role || "owner";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -69,15 +71,41 @@ const Dashboard = () => {
     return { bg: "bg-green-500", text: "text-green-600", light: "bg-green-50" };
   };
 
+  // Filter data based on search query
+  const filteredWarehouses = warehouses.filter(warehouse =>
+    warehouse.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    warehouse.location.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredInventory = inventory.filter(item =>
+    item.productName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.sku?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.category?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            Welcome back, <span className="text-blue-600">{shop?.name}</span>
-          </h1>
-          <p className="text-gray-600">Manage your inventory and warehouses</p>
+        <div className="mb-8 rounded-3xl border border-white/60 bg-white/80 p-6 shadow-lg backdrop-blur">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">{role} dashboard</p>
+              <h1 className="mt-2 text-4xl font-bold text-gray-800">
+                Welcome back, <span className="text-blue-600">{shop?.name}</span>
+              </h1>
+              <p className="mt-2 text-gray-600">
+                {role === "owner"
+                  ? "Full access to inventory, warehouses, and team settings."
+                  : role === "manager"
+                    ? "Limited admin access for day-to-day operations."
+                    : "View stock and update quantities with basic access."}
+              </p>
+            </div>
+            <div className="rounded-full bg-blue-100 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-blue-700">
+              {role}
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -132,22 +160,50 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {/* Search Bar */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="🔍 Search warehouses and products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full p-4 pr-12 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-lg"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <p className="mt-2 text-sm text-gray-600">
+              Found {filteredWarehouses.length} warehouses and {filteredInventory.length} products
+            </p>
+          )}
+        </div>
+
         {/* Warehouses */}
         <div className="space-y-6">
-          {warehouses.length === 0 ? (
+          {filteredWarehouses.length === 0 ? (
             <div className="bg-white rounded-xl shadow-lg p-12 text-center">
               <span className="text-6xl mb-4 block">🏭</span>
-              <h3 className="text-2xl font-semibold text-gray-800 mb-2">No Warehouses Yet</h3>
-              <p className="text-gray-600 mb-6">Create your first warehouse to get started</p>
-              <button
-                onClick={() => navigate("/warehouses")}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                Create Warehouse
-              </button>
+              <h3 className="text-2xl font-semibold text-gray-800 mb-2">{searchQuery ? 'No Results Found' : 'No Warehouses Yet'}</h3>
+              <p className="text-gray-600 mb-6">{searchQuery ? 'Try adjusting your search query' : 'Create your first warehouse to get started'}</p>
+              {!searchQuery && (
+                <button
+                  onClick={() => navigate("/warehouses")}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Create Warehouse
+                </button>
+              )}
             </div>
           ) : (
-            warehouses.map((warehouse) => {
+            filteredWarehouses.map((warehouse) => {
               const warehouseInventory = getInventoryForWarehouse(warehouse._id);
               const warehouseValue = warehouseInventory.reduce((sum, item) => sum + (item.quantity * item.price), 0);
               const storageInfo = warehouse.storageInfo || {

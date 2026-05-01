@@ -190,6 +190,9 @@ const Profile = () => {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">{shop?.name || 'Shop Profile'}</h1>
                 <p className="text-gray-500 mt-1">Manage your shop information</p>
+                <div className="mt-3 inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
+                  {shop?.role || 'owner'} account
+                </div>
               </div>
             </div>
             {!isEditing && (
@@ -496,7 +499,7 @@ const Profile = () => {
             <div>
               <h3 className="text-sm font-semibold text-blue-900 mb-1">Profile Information</h3>
               <p className="text-sm text-blue-700">
-                Keep your shop information up to date. This information is used throughout the application and can be accessed by the AI chatbot for personalized assistance.
+                Keep your shop information up to date. This information is used throughout the application for inventory and warehouse management.
               </p>
             </div>
           </div>
