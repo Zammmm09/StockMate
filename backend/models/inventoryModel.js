@@ -13,8 +13,9 @@ const inventorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Enforce SKU uniqueness per shop (not globally across all shops)
-inventorySchema.index({ shopId: 1, sku: 1 }, { unique: true });
+// Enforce SKU uniqueness within each warehouse for a shop.
+// The same SKU can exist in multiple warehouses so stock can be transferred.
+inventorySchema.index({ shopId: 1, warehouseId: 1, sku: 1 }, { unique: true });
 
 const Inventory = mongoose.model("Inventory", inventorySchema);
 export default Inventory;

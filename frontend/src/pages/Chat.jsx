@@ -31,7 +31,7 @@ const Chat = () => {
   const [error, setError] = useState("");
   const isReadOnlyThread = shop?.role === "employee" && selectedUser?.role === "owner";
 
-  const api = axios.create({ baseURL: "http://localhost:5000" });
+  const api = useMemo(() => axios.create({ baseURL: "http://localhost:5000" }), []);
 
   const authHeaders = useMemo(() => {
     const token = localStorage.getItem("token");
@@ -62,7 +62,7 @@ const Chat = () => {
     };
 
     loadParticipants();
-  }, [authHeaders]);
+  }, [api, authHeaders]);
 
   useEffect(() => {
     if (!shop?._id) return;
@@ -127,7 +127,7 @@ const Chat = () => {
         socketRef.current.emit("chat:leave", selectedUser._id);
       }
     };
-  }, [selectedUser, authHeaders]);
+  }, [api, selectedUser, authHeaders]);
 
   const sendMessage = async (e) => {
     e.preventDefault();

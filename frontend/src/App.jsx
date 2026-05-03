@@ -14,9 +14,10 @@ import Profile from "./pages/Profile";
 import Team from "./pages/Team";
 import ActivityLog from "./pages/ActivityLog";
 import Chat from "./pages/Chat";
+import StockMovements from "./pages/StockMovements";
 
 function App() {
-  const { shop, loading } = useContext(ShopContext);
+  const { loading } = useContext(ShopContext);
 
   // Show loading state while checking localStorage
   if (loading) {
@@ -42,6 +43,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
           <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+          <Route path="/movements" element={<ProtectedRoute><StockMovements /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/team" element={<ProtectedRoute roles={["owner", "manager"]}><Team /></ProtectedRoute>} />

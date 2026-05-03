@@ -16,6 +16,7 @@ const Navbar = () => {
   const menuItems = [
     { to: "/dashboard", label: "📊 Dashboard" },
     { to: "/inventory", label: "📦 Inventory" },
+    { to: "/movements", label: "Stock Moves" },
     { to: "/warehouses", label: "🏭 Warehouses" },
     { to: "/chat", label: "💬 Chat" },
   ];

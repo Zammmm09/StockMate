@@ -4,6 +4,7 @@ import Warehouse from "../models/warehouseModel.js";
 import protect from "../middleware/authMiddleware.js";
 import requireRoles from "../middleware/roleMiddleware.js";
 import logActivity from "../utils/activityLogger.js";
+import logStockMovement from "../utils/stockMovementLogger.js";
 
 const router = express.Router();
 
@@ -51,11 +52,21 @@ router.post("/", protect, requireRoles("owner", "manager", "employee"), async (r
       metadata: { warehouseId, productName, sku, quantity: Number(quantity), price: Number(price), category },
     });
 
+    await logStockMovement({
+      req,
+      inventoryItem: inventory,
+      oldQuantity: 0,
+      newQuantity: inventory.quantity,
+      movementType: "create",
+      reason: "Product added",
+      metadata: { price: inventory.price, category: inventory.category },
+    });
+
     res.status(201).json(inventory);
   } catch (error) {
     if (error.code === 11000 && error.keyPattern?.sku) {
       return res.status(409).json({
-        message: `SKU '${req.body?.sku}' already exists for this shop. Use a unique SKU.`,
+        message: `SKU '${req.body?.sku}' already exists in this warehouse. Use a unique SKU or update the existing item.`,
       });
     }
 
@@ -69,6 +80,140 @@ router.post("/", protect, requireRoles("owner", "manager", "employee"), async (r
     }
 
     res.status(500).json({ message: "Server Error" });
+  }
+});
+
+// Transfer stock from one warehouse to another
+router.post("/:id/transfer", protect, requireRoles("owner", "manager", "employee"), async (req, res) => {
+  try {
+    const { destinationWarehouseId, quantity, reason = "" } = req.body;
+    const shopId = req.accessShopId || req.shop._id;
+    const transferQuantity = Number(quantity);
+
+    if (!destinationWarehouseId || !Number.isFinite(transferQuantity) || transferQuantity <= 0) {
+      return res.status(400).json({ message: "Destination warehouse and a positive quantity are required" });
+    }
+
+    const sourceItem = await Inventory.findOne({ _id: req.params.id, shopId });
+    if (!sourceItem) {
+      return res.status(404).json({ message: "Source product not found or unauthorized" });
+    }
+
+    if (String(sourceItem.warehouseId) === String(destinationWarehouseId)) {
+      return res.status(400).json({ message: "Choose a different destination warehouse" });
+    }
+
+    if (sourceItem.quantity < transferQuantity) {
+      return res.status(400).json({ message: `Only ${sourceItem.quantity} units available to transfer` });
+    }
+
+    const destinationWarehouse = await Warehouse.findOne({
+      _id: destinationWarehouseId,
+      shopId,
+    });
+
+    if (!destinationWarehouse) {
+      return res.status(404).json({ message: "Destination warehouse not found or unauthorized" });
+    }
+
+    const destinationUsed = await Inventory.aggregate([
+      { $match: { shopId, warehouseId: destinationWarehouse._id } },
+      { $group: { _id: null, total: { $sum: "$quantity" } } },
+    ]);
+    const usedStorage = destinationUsed[0]?.total || 0;
+
+    if (usedStorage + transferQuantity > destinationWarehouse.capacity) {
+      return res.status(400).json({
+        message: `Not enough destination capacity. ${destinationWarehouse.capacity - usedStorage} units available.`,
+      });
+    }
+
+    const sourceOldQuantity = sourceItem.quantity;
+    let destinationItem = await Inventory.findOne({
+      shopId,
+      warehouseId: destinationWarehouse._id,
+      sku: sourceItem.sku,
+    });
+
+    const destinationOldQuantity = destinationItem?.quantity || 0;
+
+    sourceItem.quantity = sourceOldQuantity - transferQuantity;
+    await sourceItem.save();
+
+    if (destinationItem) {
+      destinationItem.quantity = destinationOldQuantity + transferQuantity;
+      destinationItem.productName = sourceItem.productName;
+      destinationItem.price = sourceItem.price;
+      destinationItem.category = sourceItem.category;
+      await destinationItem.save();
+    } else {
+      destinationItem = await Inventory.create({
+        shopId,
+        warehouseId: destinationWarehouse._id,
+        productName: sourceItem.productName,
+        sku: sourceItem.sku,
+        quantity: transferQuantity,
+        price: sourceItem.price,
+        category: sourceItem.category,
+      });
+    }
+
+    await logStockMovement({
+      req,
+      inventoryItem: sourceItem,
+      oldQuantity: sourceOldQuantity,
+      newQuantity: sourceItem.quantity,
+      movementType: "transfer-out",
+      reason: reason || `Transferred to ${destinationWarehouse.name}`,
+      metadata: {
+        destinationWarehouseId: destinationWarehouse._id,
+        destinationWarehouseName: destinationWarehouse.name,
+        transferQuantity,
+      },
+    });
+
+    await logStockMovement({
+      req,
+      inventoryItem: destinationItem,
+      oldQuantity: destinationOldQuantity,
+      newQuantity: destinationItem.quantity,
+      movementType: "transfer-in",
+      reason: reason || `Transferred from source warehouse`,
+      metadata: {
+        sourceWarehouseId: sourceItem.warehouseId,
+        sourceInventoryId: sourceItem._id,
+        transferQuantity,
+      },
+    });
+
+    await logActivity({
+      req,
+      action: "transfer",
+      entityType: "inventory",
+      entityId: sourceItem._id,
+      summary: `Transferred ${transferQuantity} units of ${sourceItem.productName}`,
+      metadata: {
+        sku: sourceItem.sku,
+        sourceInventoryId: sourceItem._id,
+        destinationInventoryId: destinationItem._id,
+        destinationWarehouseId: destinationWarehouse._id,
+        transferQuantity,
+      },
+    });
+
+    res.json({ sourceItem, destinationItem });
+  } catch (error) {
+    if (error.code === 11000 && error.keyPattern?.sku) {
+      return res.status(409).json({
+        message: "This SKU already exists in the destination warehouse. Try again after refreshing inventory.",
+      });
+    }
+
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "Invalid transfer data format" });
+    }
+
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
 });
 
@@ -86,8 +231,6 @@ router.delete("/:id", protect, requireRoles("owner", "manager", "employee"), asy
         .status(404)
         .json({ message: "Product not found or unauthorized" });
 
-    await inventoryItem.deleteOne();
-
     await logActivity({
       req,
       action: "delete",
@@ -96,6 +239,21 @@ router.delete("/:id", protect, requireRoles("owner", "manager", "employee"), asy
       summary: `Deleted product ${inventoryItem.productName}`,
       metadata: { productName: inventoryItem.productName, sku: inventoryItem.sku },
     });
+
+    await logStockMovement({
+      req,
+      inventoryItem,
+      oldQuantity: inventoryItem.quantity,
+      newQuantity: 0,
+      movementType: "delete",
+      reason: "Product deleted",
+      metadata: {
+        price: inventoryItem.price,
+        category: inventoryItem.category,
+      },
+    });
+
+    await inventoryItem.deleteOne();
 
     res.json({ message: "Product deleted successfully" });
   } catch (error) {
@@ -126,13 +284,16 @@ router.put("/:id", protect, async (req, res) => {
       category: inventoryItem.category,
     };
 
+    const oldQuantity = Number(inventoryItem.quantity) || 0;
+
     // Only update the fields they actually sent
-    if (quantity !== undefined) inventoryItem.quantity = quantity;
-    if (price !== undefined) inventoryItem.price = price;
+    if (quantity !== undefined) inventoryItem.quantity = Number(quantity);
+    if (price !== undefined) inventoryItem.price = Number(price);
     if (productName !== undefined) inventoryItem.productName = productName;
     if (category !== undefined) inventoryItem.category = category;
 
     await inventoryItem.save();
+    const newQuantity = Number(inventoryItem.quantity) || 0;
 
     await logActivity({
       req,
@@ -141,6 +302,30 @@ router.put("/:id", protect, async (req, res) => {
       entityId: inventoryItem._id,
       summary: `Updated inventory item ${inventoryItem.productName}`,
       metadata: { before: previousState, after: { productName: inventoryItem.productName, sku: inventoryItem.sku, quantity: inventoryItem.quantity, price: inventoryItem.price, category: inventoryItem.category } },
+    });
+
+    await logStockMovement({
+      req,
+      inventoryItem,
+      oldQuantity,
+      newQuantity,
+      movementType: "adjust",
+      reason:
+        oldQuantity === newQuantity
+          ? "Inventory details edited"
+          : newQuantity > oldQuantity
+            ? "Quantity increased"
+            : "Quantity decreased",
+      metadata: {
+        before: previousState,
+        after: {
+          productName: inventoryItem.productName,
+          sku: inventoryItem.sku,
+          quantity: inventoryItem.quantity,
+          price: inventoryItem.price,
+          category: inventoryItem.category,
+        },
+      },
     });
 
     res.json(inventoryItem);
@@ -213,8 +398,20 @@ router.patch("/update-quantities", protect, async (req, res) => {
         shopId,
       });
       if (inventoryItem) {
-        inventoryItem.quantity = quantity;
-        return inventoryItem.save();
+        const oldQuantity = Number(inventoryItem.quantity) || 0;
+        inventoryItem.quantity = Number(quantity);
+        const savedItem = await inventoryItem.save();
+
+        await logStockMovement({
+          req,
+          inventoryItem: savedItem,
+          oldQuantity,
+          newQuantity: savedItem.quantity,
+          movementType: "bulk-adjust",
+          reason: "Bulk quantity update",
+        });
+
+        return savedItem;
       }
       return null;
     });

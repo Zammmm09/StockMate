@@ -74,7 +74,7 @@ const ActivityLog = () => {
     });
   };
 
-  const getActionIcon = (action, entityType) => {
+  const getActionIcon = (action) => {
     if (action === "create") return "➕";
     if (action === "update") return "✏️";
     if (action === "delete") return "🗑️";

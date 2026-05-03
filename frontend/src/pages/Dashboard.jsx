@@ -4,11 +4,12 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const Dashboard = () => {
-  const { shop, logoutShop } = useContext(ShopContext);
+  const { shop } = useContext(ShopContext);
   const navigate = useNavigate();
   const [warehouses, setWarehouses] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const role = shop?.role || "owner";
 
@@ -24,10 +25,14 @@ const Dashboard = () => {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
-        setWarehouses(warehousesRes.data);
-        setInventory(inventoryRes.data);
+        setWarehouses(Array.isArray(warehousesRes.data) ? warehousesRes.data : []);
+        setInventory(Array.isArray(inventoryRes.data) ? inventoryRes.data : []);
+        setError("");
       } catch (error) {
         console.error("Error fetching data", error);
+        setWarehouses([]);
+        setInventory([]);
+        setError(error.response?.data?.message || "Unable to load dashboard data. Make sure the backend server is running.");
       } finally {
         setLoading(false);
       }
@@ -35,13 +40,11 @@ const Dashboard = () => {
     fetchData();
   }, []);
 
-  const handleLogout = () => {
-    logoutShop();
-    navigate("/login");
-  };
-
   const getInventoryForWarehouse = (warehouseId) => {
-    return inventory.filter((item) => item.warehouseId === warehouseId);
+    return inventory.filter((item) => {
+      const itemWarehouseId = item.warehouseId?._id || item.warehouseId;
+      return String(itemWarehouseId) === String(warehouseId);
+    });
   };
 
   if (loading) {
@@ -57,24 +60,21 @@ const Dashboard = () => {
 
   const totalInventory = inventory.length;
   const totalWarehouses = warehouses.length;
-  const totalValue = inventory.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  const totalValue = inventory.reduce(
+    (sum, item) => sum + ((Number(item.quantity) || 0) * (Number(item.price) || 0)),
+    0
+  );
   
   // Calculate total storage capacity and usage
-  const totalCapacity = warehouses.reduce((sum, w) => sum + w.capacity, 0);
+  const totalCapacity = warehouses.reduce((sum, w) => sum + Number(w.capacity || 0), 0);
   const totalUsed = warehouses.reduce((sum, w) => sum + (w.storageInfo?.used || 0), 0);
   const totalRemaining = totalCapacity - totalUsed;
   const overallUsagePercentage = totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0;
 
-  const getStorageColor = (percentage) => {
-    if (percentage >= 90) return { bg: "bg-red-500", text: "text-red-600", light: "bg-red-50" };
-    if (percentage >= 70) return { bg: "bg-yellow-500", text: "text-yellow-600", light: "bg-yellow-50" };
-    return { bg: "bg-green-500", text: "text-green-600", light: "bg-green-50" };
-  };
-
   // Filter data based on search query
   const filteredWarehouses = warehouses.filter(warehouse =>
-    warehouse.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    warehouse.location.toLowerCase().includes(searchQuery.toLowerCase())
+    warehouse.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    warehouse.location?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredInventory = inventory.filter(item =>
@@ -107,6 +107,13 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {error && (
+          <div className="mb-8 rounded-xl border border-red-200 bg-red-50 p-5 text-red-700 shadow-sm">
+            <p className="font-semibold">Dashboard data could not be loaded</p>
+            <p className="mt-1 text-sm">{error}</p>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -205,7 +212,10 @@ const Dashboard = () => {
           ) : (
             filteredWarehouses.map((warehouse) => {
               const warehouseInventory = getInventoryForWarehouse(warehouse._id);
-              const warehouseValue = warehouseInventory.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+              const warehouseValue = warehouseInventory.reduce(
+                (sum, item) => sum + ((Number(item.quantity) || 0) * (Number(item.price) || 0)),
+                0
+              );
               const storageInfo = warehouse.storageInfo || {
                 used: 0,
                 remaining: warehouse.capacity,
@@ -213,8 +223,7 @@ const Dashboard = () => {
                 usagePercentage: 0,
                 itemCount: 0
               };
-              const colors = getStorageColor(storageInfo.usagePercentage);
-              
+              const usagePercentage = Number(storageInfo.usagePercentage) || 0;
               return (
                 <div key={warehouse._id} className="bg-white rounded-xl shadow-lg overflow-hidden">
                   <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
@@ -236,13 +245,13 @@ const Dashboard = () => {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium">Storage Usage</span>
                         <span className="text-sm font-semibold">
-                          {storageInfo.usagePercentage}% used
+                          {usagePercentage}% used
                         </span>
                       </div>
                       <div className="w-full bg-white/30 rounded-full h-2.5 overflow-hidden">
                         <div
                           className={`h-full bg-white transition-all duration-500 rounded-full`}
-                          style={{ width: `${Math.min(storageInfo.usagePercentage, 100)}%` }}
+                          style={{ width: `${Math.min(usagePercentage, 100)}%` }}
                         ></div>
                       </div>
                       <div className="flex items-center justify-between mt-2 text-xs">
@@ -297,7 +306,7 @@ const Dashboard = () => {
                                   </td>
                                   <td className="py-4 px-4 whitespace-nowrap">
                                     <div className="text-sm font-semibold text-green-600">
-                                      ${(item.quantity * item.price).toLocaleString()}
+                                      ${(((Number(item.quantity) || 0) * (Number(item.price) || 0)).toLocaleString())}
                                     </div>
                                   </td>
                                 </tr>

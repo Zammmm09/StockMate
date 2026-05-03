@@ -7,6 +7,7 @@ import activityRoutes from "./routes/activityRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import warehouseRoutes from "./routes/warehouseRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
+import stockMovementRoutes from "./routes/stockMovementRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import { initSocket } from "./utils/socket.js";
 
@@ -23,6 +24,7 @@ app.use("/api/activity", activityRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/warehouse", warehouseRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/stock-movements", stockMovementRoutes);
 
 // These handle user registration and login
 app.use("/api", authRoutes);
